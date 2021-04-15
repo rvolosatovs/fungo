@@ -1,17 +1,17 @@
 .PHONY: all
 all: translate test
 
-SRC := $(wildcard *.go2 **/*.go2)
-
 .PHONY: translate
-translate: $(SRC)
-	go tool go2go translate $(SRC)
+translate: $(shell find . -type f -name '*.go2' -printf '%P\n')
+	go tool go2go translate ./internal/test/*.go2
+	go tool go2go translate *.go2
+	go tool go2go translate maps/*.go2
 
 .PHONY: test
 test: translate
 	go test -v ./...
 
-OUT := $(wildcard *.go **/*.go)
+OUT := $(shell find . -type f -name '*.go' -printf '%P\n')
 
 .PHONY: clean
 clean: $(OUT)
