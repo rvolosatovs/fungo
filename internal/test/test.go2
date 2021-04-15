@@ -1,0 +1,196 @@
+package test
+
+import (
+    "fmt"
+	"reflect"
+	"testing"
+)
+
+func AssertEqual[T comparable](t *testing.T, got, expected T) bool {
+	if got != expected {
+		t.Errorf(`Got:
+%v
+
+Expected:
+%v`,
+			got, expected)
+		return false
+	}
+	return true
+}
+
+func AssertDeepEqual(t *testing.T, got, expected interface{}) bool {
+	if !reflect.DeepEqual(got, expected) {
+		t.Errorf(`Got:
+%v
+
+Expected:
+%v`,
+			got, expected)
+		return false
+	}
+	return true
+}
+
+func AssertSameElementsDeepEqual(t *testing.T, got, expected interface{}) bool {
+	if !SameElements(reflect.DeepEqual, got, expected) {
+		t.Errorf(`Got:
+%v
+
+Expected:
+%v`,
+			got, expected)
+		return false
+	}
+	return true
+}
+
+// TODO: Rewrite using generics
+// NOTE: The following is copied from https://github.com/TheThingsNetwork/lorawan-stack/blob/ca69664daf81707aa1f05a707490f878343c1823/pkg/util/test/elements.go#L34-L179
+
+// Ranger represents an entity, which can be ranged over(e.g. sync.Map).
+type Ranger interface {
+	Range(f func(k, v interface{}) bool)
+}
+
+type indexRanger struct {
+	reflect.Value
+}
+
+func (rv indexRanger) Range(f func(k, v interface{}) bool) {
+	for i := 0; i < rv.Len(); i++ {
+		if !f(i, rv.Index(i).Interface()) {
+			return
+		}
+	}
+}
+
+type mapRanger struct {
+	reflect.Value
+}
+
+func (rv mapRanger) Range(f func(k, v interface{}) bool) {
+	for _, k := range rv.MapKeys() {
+		if !f(k.Interface(), rv.MapIndex(k).Interface()) {
+			return
+		}
+	}
+}
+
+// WrapRanger returns Ranger, true if v can be ranged over and nil, false otherwise.
+func WrapRanger(v interface{}) (Ranger, bool) {
+	r, ok := v.(Ranger)
+	if ok {
+		return r, ok
+	}
+
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.String, reflect.Slice, reflect.Array:
+		return indexRanger{rv}, true
+	case reflect.Map:
+		return mapRanger{rv}, true
+	}
+	return nil, false
+}
+
+// MapKeys returns the keys of a map as a slice.
+func MapKeys(m interface{}) []interface{} {
+	if m == nil {
+		return nil
+	}
+	rv := reflect.ValueOf(m)
+	if rv.Kind() != reflect.Map {
+		panic(fmt.Errorf("expected %T to be of map type", m))
+	}
+	ks := make([]interface{}, 0, rv.Len())
+	for _, k := range rv.MapKeys() {
+		ks = append(ks, k.Interface())
+	}
+	return ks
+}
+
+// IsSubsetOfElements returns true iff a multiset sub represents a subset of
+// multiset super under equality given by eq.
+// Signature of eq must be func(A, B) bool, where A, B are types, which
+// elements of sub and super can be assigned to respectively.
+// It panics if either sub or super is not one of:
+// 1. string, slice, array or map kind
+// 2. value, which implements Ranger interface(e.g. sync.Map)
+// NOTE: Map key values are not taken into account.
+func IsSubsetOfElements(eq interface{}, sub, super interface{}) bool {
+	if sub == nil {
+		// NOTE: Empty set is a subset of any set.
+		return true
+	}
+	if super == nil {
+		// NOTE: No non-empty set is a subset of empty set.
+		return false
+	}
+
+	ev := reflect.ValueOf(eq)
+	if ev.Kind() != reflect.Func {
+		panic(fmt.Errorf("expected kind of eq to be a function, got: %s", ev.Kind()))
+	}
+	subR, ok := WrapRanger(sub)
+	if !ok {
+		panic(fmt.Errorf("cannot range over values of type %T", sub))
+	}
+	supR, ok := WrapRanger(super)
+	if !ok {
+		panic(fmt.Errorf("cannot range over values of type %T", super))
+	}
+
+	type entry struct {
+		value reflect.Value
+		found uint
+	}
+	entries := map[*entry]struct{}{}
+
+	findEntry := func(v reflect.Value) *entry {
+		for e := range entries {
+			if ev.Call([]reflect.Value{e.value, v})[0].Bool() {
+				return e
+			}
+		}
+		return nil
+	}
+
+	subR.Range(func(_, v interface{}) bool {
+		rv := reflect.ValueOf(v)
+		e := findEntry(rv)
+		if e == nil {
+			entries[&entry{
+				value: rv,
+				found: 1,
+			}] = struct{}{}
+		} else {
+			e.found++
+		}
+		return true
+	})
+	supR.Range(func(_, v interface{}) bool {
+		rv := reflect.ValueOf(v)
+		e := findEntry(rv)
+		if e == nil {
+			return true
+		}
+		if e.found == 1 {
+			delete(entries, e)
+		} else {
+			e.found--
+		}
+		return true
+	})
+	return len(entries) == 0
+}
+
+// IsProperSubsetOfElements is like IsSubsetOfElements, but checks for proper subset.
+func IsProperSubsetOfElements(eq interface{}, sub, super interface{}) bool {
+	return IsSubsetOfElements(eq, sub, super) && !IsSubsetOfElements(eq, super, sub)
+}
+
+// SameElements returns true iff IsSubsetOfElements(eq, xs, ys) returns true and IsSubsetOfElements(eq, ys, xs) returns true and false otherwise.
+func SameElements(eq interface{}, xs, ys interface{}) bool {
+	return IsSubsetOfElements(eq, xs, ys) && IsSubsetOfElements(eq, ys, xs)
+}

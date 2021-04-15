@@ -1,11 +1,11 @@
 package fungo_test
 
 import (
-	"reflect"
 	"strconv"
 	"testing"
 
 	"github.com/rvolosatovs/fungo"
+	"github.com/rvolosatovs/fungo/internal/test"
 )
 
 type MapTestCase[F, T any] struct {
@@ -17,14 +17,7 @@ type MapTestCase[F, T any] struct {
 
 func runMapTest[F, T any](t *testing.T, tc MapTestCase[F, T]) bool {
 	return t.Run(tc.Name, func(t *testing.T) {
-		if r := fungo.Map(tc.Func, tc.Values...); !reflect.DeepEqual(r, tc.Expected) {
-			t.Errorf(`Got:
-%v
-
-Expected:
-%v`,
-				r, tc.Expected)
-		}
+        test.AssertDeepEqual(t, fungo.Map(tc.Func, tc.Values...), tc.Expected)
 	})
 }
 
@@ -61,14 +54,7 @@ type FoldTestCase[F, T any] struct {
 
 func runFoldTest[F, T any](t *testing.T, tc FoldTestCase[F, T]) bool {
 	return t.Run(tc.Name, func(t *testing.T) {
-		if r := fungo.Fold(tc.Func, tc.Init, tc.Values...); !reflect.DeepEqual(r, tc.Expected) {
-			t.Errorf(`Got:
-%v
-
-Expected:
-%v`,
-				r, tc.Expected)
-		}
+        test.AssertDeepEqual(t, fungo.Fold(tc.Func, tc.Init, tc.Values...), tc.Expected)
 	})
 }
 
@@ -104,14 +90,7 @@ type ReduceTestCase[T any] struct {
 
 func runReduceTest[T any](t *testing.T, tc ReduceTestCase[T]) bool {
 	return t.Run(tc.Name, func(t *testing.T) {
-		if r := fungo.Reduce(tc.Func, tc.Values...); !reflect.DeepEqual(r, tc.Expected) {
-			t.Errorf(`Got:
-%v
-
-Expected:
-%v`,
-				r, tc.Expected)
-		}
+        test.AssertDeepEqual(t, fungo.Reduce(tc.Func, tc.Values...), tc.Expected)
 	})
 }
 
