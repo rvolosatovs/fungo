@@ -2,9 +2,9 @@
 
 Functional Go using Go2 generics.
 
-# Usage
+# Development
 
 ```sh
-go tool go2go translate fungo_test.go2
-go test -v
+go tool go2go translate **/*.go2
+go test -v ./...
 ```
