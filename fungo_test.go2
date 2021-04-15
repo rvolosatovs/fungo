@@ -17,13 +17,13 @@ type MapTestCase[F, T any] struct {
 
 func runMapTest[F, T any](t *testing.T, tc MapTestCase[F, T]) bool {
 	return t.Run(tc.Name, func(t *testing.T) {
-		if ret := fungo.Map(tc.Func, tc.Values...); !reflect.DeepEqual(ret, tc.Expected) {
+		if r := fungo.Map(tc.Func, tc.Values...); !reflect.DeepEqual(r, tc.Expected) {
 			t.Errorf(`Got:
 %v
 
 Expected:
 %v`,
-				ret, tc.Expected)
+				r, tc.Expected)
 		}
 	})
 }
@@ -61,13 +61,13 @@ type FoldTestCase[F, T any] struct {
 
 func runFoldTest[F, T any](t *testing.T, tc FoldTestCase[F, T]) bool {
 	return t.Run(tc.Name, func(t *testing.T) {
-		if ret := fungo.Fold(tc.Func, tc.Init, tc.Values...); !reflect.DeepEqual(ret, tc.Expected) {
+		if r := fungo.Fold(tc.Func, tc.Init, tc.Values...); !reflect.DeepEqual(r, tc.Expected) {
 			t.Errorf(`Got:
 %v
 
 Expected:
 %v`,
-				ret, tc.Expected)
+				r, tc.Expected)
 		}
 	})
 }

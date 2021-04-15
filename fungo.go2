@@ -15,11 +15,11 @@
 package fungo
 
 func Map[F, T any](f func(F) T, vs ...F) []T {
-	ret := make([]T, 0, len(vs))
+	r := make([]T, 0, len(vs))
 	for _, v := range vs {
-		ret = append(ret, f(v))
+		r = append(r, f(v))
 	}
-	return ret
+	return r
 }
 
 func Fold[F, T any](f func(T, F) T, init T, vs ...F) T {
