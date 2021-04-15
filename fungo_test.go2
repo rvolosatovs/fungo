@@ -94,3 +94,46 @@ func TestFold(t *testing.T) {
 		runFoldTest(t, tc)
 	}
 }
+
+type ReduceTestCase[T any] struct {
+    Name     string
+    Func     func(T, T) T
+    Values   []T
+    Expected T
+}
+
+func runReduceTest[T any](t *testing.T, tc ReduceTestCase[T]) bool {
+	return t.Run(tc.Name, func(t *testing.T) {
+		if r := fungo.Reduce(tc.Func, tc.Values...); !reflect.DeepEqual(r, tc.Expected) {
+			t.Errorf(`Got:
+%v
+
+Expected:
+%v`,
+				r, tc.Expected)
+		}
+	})
+}
+
+func TestReduce(t *testing.T) {
+	for _, tc := range []ReduceTestCase[int]{
+		{
+			Name:     "sum",
+			Func:     func(acc int, v int) int { return acc+v },
+			Values:   []int{1, 2, 3},
+			Expected: 6,
+		},
+	} {
+		runReduceTest(t, tc)
+	}
+	for _, tc := range []ReduceTestCase[string]{
+		{
+			Name:     "append string",
+			Func:     func(acc string, v string) string { return acc+v },
+			Values:   []string{"1", "2", "3"},
+			Expected: "123",
+		},
+	} {
+		runReduceTest(t, tc)
+	}
+}

@@ -36,3 +36,17 @@ func Fold[F, T any](f func(T, F) T, init T, vs ...F) T {
 	}
 	return acc
 }
+
+// Reduce reduces the elements a single element by calling the function f
+// on every element of the slice vs returning a new result.
+func Reduce[T any](f func(T, T) T, vs ...T) T {
+	if len(vs) == 0 {
+		var r T
+		return r
+	}
+	r := vs[0]
+	for _, v := range vs[1:] {
+		r = f(r, v)
+	}
+	return r
+}
