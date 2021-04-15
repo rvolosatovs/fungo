@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package fungo provides functional programming primitives.
 package fungo
 
+// Map calls the function f on every element of the slice vs,
+// returning a new slice of the results.
 func Map[F, T any](f func(F) T, vs ...F) []T {
 	r := make([]T, 0, len(vs))
 	for _, v := range vs {
@@ -22,6 +25,10 @@ func Map[F, T any](f func(F) T, vs ...F) []T {
 	return r
 }
 
+// TODO: Improve comment
+
+// Fold calls the function f on every element of the slice vs,
+// returning a new result.
 func Fold[F, T any](f func(T, F) T, init T, vs ...F) T {
 	acc := init
 	for _, v := range vs {
