@@ -18,9 +18,9 @@ package fungo
 // Map calls the function f on every element of the slice vs,
 // returning a new slice of the results.
 func Map[F, T any](f func(F) T, vs ...F) []T {
-	r := make([]T, 0, len(vs))
-	for _, v := range vs {
-		r = append(r, f(v))
+	r := make([]T, len(vs))
+	for i, v := range vs {
+		r[i] = f(v)
 	}
 	return r
 }
