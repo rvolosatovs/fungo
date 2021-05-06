@@ -1,0 +1,29 @@
+package slices_test
+
+import (
+    "testing"
+
+    "github.com/rvolosatovs/fungo/internal/test"
+    "github.com/rvolosatovs/fungo/slices"
+)
+
+type ValuesTestCase[T any] struct {
+    Value []T
+}
+
+func (tc ValuesTestCase[T]) Run(t *testing.T) {
+	test.AssertDeepEqual(t, slices.Collect[T](slices.Values(tc.Value), []T{}), tc.Value)
+}
+
+func TestValues(t *testing.T) {
+	for name, tc := range map[string]test.Runner{
+		"[]string": ValuesTestCase[string]{
+			Value:    []string{"3", "1", "2"},
+		},
+		"[]struct{}": ValuesTestCase[struct{}]{
+			Value: []struct{}{{}, {}, {}},
+		},
+	} {
+		t.Run(name, tc.Run)
+	}
+}
