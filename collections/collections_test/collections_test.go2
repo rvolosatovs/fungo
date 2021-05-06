@@ -52,7 +52,7 @@ func TestRanger(t *testing.T) {
 						strconv.Itoa,
 						collections.CollectFold[int, slices.ValueRanger[int]](
 							foldSort,
-							make(slices.ValueRanger[int], 0, 4),
+							make(slices.ValueRanger[int], 0, 5),
 							collections.Map[int, int](
 								func(v int) int { return v + 2 },
 								r,
@@ -80,7 +80,7 @@ func TestRanger(t *testing.T) {
 						}),
 						collections.CollectFoldFunc[int, slices.ValueRanger[int]](
 							foldSort,
-							make([]int, 0, 4),
+							make([]int, 0, 5),
 						),
 					),
 					collections.MapFunc[int, string](
