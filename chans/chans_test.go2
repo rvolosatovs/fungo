@@ -1,0 +1,42 @@
+package chans_test
+
+import (
+    "testing"
+
+    "github.com/rvolosatovs/fungo/internal/test"
+    "github.com/rvolosatovs/fungo/chans"
+    "github.com/rvolosatovs/fungo/slices"
+)
+
+type ValuesTestCase[T any] struct {
+    Value	 <-chan T
+    Expected []T
+}
+
+func (tc ValuesTestCase[T]) Run(t *testing.T) {
+	test.AssertDeepEqual(t, slices.Collect[T](chans.Values(tc.Value), []T{}), tc.Expected)
+}
+
+func makeChan[T any](vs ...T) chan T {
+	ch := make(chan T, len(vs))
+	for _, v := range vs {
+		ch <- v
+	}
+	close(ch)
+	return ch
+}
+
+func TestValues(t *testing.T) {
+	for name, tc := range map[string]test.Runner{
+		"chan string": ValuesTestCase[string]{
+			Value:		 makeChan("3", "1", "2"),
+			Expected:    []string{"3", "1", "2"},
+		},
+		"chan struct{}": ValuesTestCase[struct{}]{
+			Value:		 makeChan(struct{}{}, struct{}{}, struct{}{}),
+			Expected:    []struct{}{{}, {}, {}},
+		},
+	} {
+		t.Run(name, tc.Run)
+	}
+}
