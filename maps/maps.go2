@@ -15,6 +15,10 @@
 // Package maps provides general functions that work for all map types.
 package maps
 
+import (
+	"sync"
+)
+
 type KeyRanger[K comparable, V any] map[K]V
 
 func (r KeyRanger[T, Unused]) Range(f func(T) bool) {
@@ -41,4 +45,44 @@ func (r ValueRanger[Unused, T]) Range(f func(T) bool) {
 
 func Values[K comparable, V any] (m map[K]V) ValueRanger[K, V] {
 	return ValueRanger[K, V](m)
+}
+
+// Sync is a type-safe map, safe for concurrent use.
+type Sync[K comparable, V any] struct{
+	mu sync.RWMutex
+	m  map[K]V
+}
+
+type SyncKeyRanger[K comparable, V any] Sync[K, V]
+
+func (r SyncKeyRanger[T, Unused]) Range(f func(T) bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for k := range r.m {
+		if !f(k) {
+			return
+		}
+	}
+}
+
+func SyncKeys[K comparable, V any] (m Sync[K, V]) SyncKeyRanger[K, V] {
+	return SyncKeyRanger[K, V](m)
+}
+
+type SyncValueRanger[K comparable, V any] Sync[K, V]
+
+func (r SyncValueRanger[Unused, T]) Range(f func(T) bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, v := range r.m {
+		if !f(v) {
+			return
+		}
+	}
+}
+
+func SyncValues[K comparable, V any] (m Sync[K, V]) SyncValueRanger[K, V] {
+	return SyncValueRanger[K, V](m)
 }
