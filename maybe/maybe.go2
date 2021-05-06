@@ -1,0 +1,75 @@
+// Copyright 2021 Romans Volosatovs
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package maybe provides maybe wrapper and related utilities.
+package maybe
+
+type Wrapper[T any] struct{
+	Value T
+	Ok bool
+}
+
+func Wrap[T any](v T, ok bool) Wrapper[T] {
+	return Wrapper[T]{
+		Value: v,
+		Ok:	ok,
+	}
+}
+
+func (w Wrapper[T]) Collect() (T, bool) {
+	return w.Value, w.Ok
+}
+
+func (w Wrapper[T]) Range(f func(T) bool) {
+	if !w.Ok {
+		return
+	}
+	f(w.Value)
+}
+
+func Map[F, T any](f func(F) T, r Wrapper[F]) Wrapper[T] {
+	if !r.Ok {
+		return Wrapper[T]{}
+	}
+	return Wrapper[T]{
+		Value: f(r.Value),
+		Ok:	true,
+	}
+}
+
+func MapFunc[F, T any](f func(F) T) func(Wrapper[F]) Wrapper[T] {
+	return func(r Wrapper[F]) Wrapper[T] {
+		return Map(f, r)
+	}
+}
+
+func MapMaybe[F, T any](f func(F) (T, bool), r Wrapper[F]) Wrapper[T] {
+	if !r.Ok {
+		return Wrapper[T]{}
+	}
+	v, ok := f(r.Value)
+	if !ok {
+		return Wrapper[T]{}
+	}
+	return Wrapper[T]{
+		Value: v,
+		Ok: true,
+	}
+}
+
+func MapMaybeFunc[F, T any](f func(F) (T, bool)) func(Wrapper[F]) Wrapper[T] {
+	return func(r Wrapper[F]) Wrapper[T] {
+		return MapMaybe(f, r)
+	}
+}
