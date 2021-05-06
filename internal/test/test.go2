@@ -6,6 +6,10 @@ import (
 	"testing"
 )
 
+type Runner interface{
+	Run(*testing.T)
+}
+
 func AssertEqual[T comparable](t *testing.T, got, expected T) bool {
 	if got != expected {
 		t.Errorf(`Got:
