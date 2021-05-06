@@ -15,30 +15,30 @@
 // Package maps provides general functions that work for all map types.
 package maps
 
-// From https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#map-keys
+type KeyRanger[K comparable, V any] map[K]V
 
-// Keys returns the keys of the map m in a slice.
-// The keys will be returned in an unpredictable order.
-// This function has two type parameters, K and V.
-// Map keys must be comparable, so key has the predeclared
-// constraint comparable. Map values can be any type.
-func Keys[K comparable, V any](m map[K]V) []K {
-	r := make([]K, 0, len(m))
-	for k := range m {
-		r = append(r, k)
+func (r KeyRanger[T, Unused]) Range(f func(T) bool) {
+	for k := range r {
+		if !f(k) {
+			return
+		}
 	}
-	return r
 }
 
-// Values returns the values of the map m in a slice.
-// The values will be returned in an unpredictable order.
-// This function has two type parameters, K and V.
-// Map keys must be comparable, so key has the predeclared
-// constraint comparable. Map values can be any type.
-func Values[K comparable, V any](m map[K]V) []V {
-	r := make([]V, 0, len(m))
-	for _, v := range m {
-		r = append(r, v)
+func Keys[K comparable, V any] (m map[K]V) KeyRanger[K, V] {
+	return KeyRanger[K, V](m)
+}
+
+type ValueRanger[K comparable, V any] map[K]V
+
+func (r ValueRanger[Unused, T]) Range(f func(T) bool) {
+	for _, v := range r {
+		if !f(v) {
+			return
+		}
 	}
-	return r
+}
+
+func Values[K comparable, V any] (m map[K]V) ValueRanger[K, V] {
+	return ValueRanger[K, V](m)
 }

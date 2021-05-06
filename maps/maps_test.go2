@@ -1,11 +1,11 @@
 package maps_test
 
 import (
-    "fmt"
     "testing"
 
-    "github.com/rvolosatovs/fungo/maps"
     "github.com/rvolosatovs/fungo/internal/test"
+    "github.com/rvolosatovs/fungo/maps"
+    "github.com/rvolosatovs/fungo/slices"
 )
 
 type KeysTestCase[K comparable, V any] struct {
@@ -13,20 +13,22 @@ type KeysTestCase[K comparable, V any] struct {
     Expected []K
 }
 
-func runKeysTest[K comparable, V any](t *testing.T, tc KeysTestCase[K, V]) bool {
-	return t.Run(fmt.Sprintf("%T", tc.Value), func(t *testing.T) {
-        test.AssertSameElementsDeepEqual(t, maps.Keys(tc.Value), tc.Expected)
-	})
+func (tc KeysTestCase[K, V]) Run(t *testing.T) {
+	test.AssertSameElementsDeepEqual(t, slices.Collect[K](maps.Keys(tc.Value), []K{}), tc.Expected)
 }
 
 func TestKeys(t *testing.T) {
-	for _, tc := range []KeysTestCase[string, int]{
-		{
+	for name, tc := range map[string]test.Runner{
+		"string->int": KeysTestCase[string, int]{
 			Value:    map[string]int{"1": 1, "2": 2, "3": 3},
 			Expected: []string{"1", "2", "3"},
 		},
+		"int->struct{}": KeysTestCase[int, struct{}]{
+			Value:    map[int]struct{}{1: struct{}{}, 42: struct{}{}, 512: struct{}{}},
+			Expected: []int{1, 42, 512},
+		},
 	} {
-		runKeysTest(t, tc)
+		t.Run(name, tc.Run)
 	}
 }
 
@@ -35,19 +37,21 @@ type ValuesTestCase[K comparable, V any] struct {
     Expected []V
 }
 
-func runValuesTest[K comparable, V any](t *testing.T, tc ValuesTestCase[K, V]) bool {
-	return t.Run(fmt.Sprintf("%T", tc.Value), func(t *testing.T) {
-        test.AssertSameElementsDeepEqual(t, maps.Values(tc.Value), tc.Expected)
-	})
+func (tc ValuesTestCase[K, V]) Run(t *testing.T) {
+	test.AssertSameElementsDeepEqual(t, slices.Collect[V](maps.Values(tc.Value), []V{}), tc.Expected)
 }
 
 func TestValues(t *testing.T) {
-	for _, tc := range []ValuesTestCase[string, int]{
-		{
+	for name, tc := range map[string]test.Runner{
+		"string->int": ValuesTestCase[string, int]{
 			Value:    map[string]int{"1": 1, "2": 2, "3": 3},
 			Expected: []int{1, 2, 3},
 		},
+		"int->struct{}": ValuesTestCase[int, struct{}]{
+			Value:    map[int]struct{}{1: struct{}{}, 42: struct{}{}, 512: struct{}{}},
+			Expected: []struct{}{{}, {}, {}},
+		},
 	} {
-		runValuesTest(t, tc)
+		t.Run(name, tc.Run)
 	}
 }
