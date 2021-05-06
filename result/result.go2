@@ -1,0 +1,72 @@
+// Copyright 2021 Romans Volosatovs
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package result provides result wrapper and related utilities.
+package result
+
+type Wrapper[T any] struct{
+	Value T
+	Error error
+}
+
+func Wrap[T any](v T, err error) Wrapper[T] {
+	return Wrapper[T]{
+		Value: v,
+		Error: err,
+	}
+}
+
+func (w Wrapper[T]) Collect() (T, error) {
+	return w.Value, w.Error
+}
+
+func Map[F, T any](f func(F) T, r Wrapper[F]) Wrapper[T] {
+	if r.Error != nil {
+		return Wrapper[T]{
+			Error: r.Error,
+		}
+	}
+	return Wrapper[T]{
+		Value: f(r.Value),
+	}
+}
+
+func MapFunc[F, T any](f func(F) T) func(Wrapper[F]) Wrapper[T] {
+	return func(r Wrapper[F]) Wrapper[T] {
+		return Map(f, r)
+	}
+}
+
+func MapResult[F, T any](f func(F) (T, error), r Wrapper[F]) Wrapper[T] {
+	if r.Error != nil {
+		return Wrapper[T]{
+			Error: r.Error,
+		}
+	}
+	v, err := f(r.Value)
+	if err != nil {
+		return Wrapper[T]{
+			Error: err,
+		}
+	}
+	return Wrapper[T]{
+		Value: v,
+	}
+}
+
+func MapResultFunc[F, T any](f func(F) (T, error)) func(Wrapper[F]) Wrapper[T] {
+	return func(r Wrapper[F]) Wrapper[T] {
+		return MapResult(f, r)
+	}
+}
