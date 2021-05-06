@@ -1,0 +1,252 @@
+// Copyright 2021 Romans Volosatovs
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package collections provides lazy, concurrent, generic collections and functionality to act upon them.
+package collections
+
+import (
+	"sync"
+	"sync/atomic"
+
+	"github.com/rvolosatovs/fungo/result"
+)
+
+type Collection[T any] interface{
+	Collect() T
+}
+
+type Ranger[T any] interface{
+	Range(func(T) bool)
+}
+
+func Compose[F1 any, T1 Ranger[F2], F2, T2 any](f func(F1) T1, g func(Ranger[F2]) T2) func(F1) T2 {
+	return func(v F1) T2 {
+		return g(f(v))
+	}
+}
+
+func ComposeFunc[F1 any, T1 Ranger[F2], F2, T2 any](f func(F1) T1) func(func(Ranger[F2]) T2) func(F1) T2 {
+	return func(g func(Ranger[F2]) T2) func(F1) T2 {
+		return Compose(f, g)
+	}
+}
+
+type MapRanger[F, T any] struct {
+	f func(F) T
+	ranger Ranger[F]
+}
+
+func (r MapRanger[F, T]) Range(f func(T) bool) {
+	r.ranger.Range(func(v F) bool{
+		f(r.f(v))
+		return true
+	})
+}
+
+// Map calls the function f on every element in r.
+func Map[F, T any](f func(F) T, r Ranger[F]) MapRanger[F, T] {
+	return MapRanger[F, T]{
+		f: f,
+		ranger: r,
+	}
+}
+
+// MapFunc is Map with bound f parameter.
+func MapFunc[F, T any](f func(F) T) func(r Ranger[F]) MapRanger[F, T] {
+	return func(r Ranger[F]) MapRanger[F, T] {
+		return Map(f, r)
+	}
+}
+
+// MapResult calls the function f on every element in r.
+func MapResult[F, T any](f func(F) (T, error), r Ranger[F]) MapRanger[F, result.Wrapper[T]] {
+	return MapRanger[F, result.Wrapper[T]]{
+		f: func(v F) result.Wrapper[T]{
+			return result.Wrap(f(v))
+		},
+		ranger: r,
+	}
+}
+
+// MapResultFunc is MapResult with bound f parameter.
+func MapResultFunc[F, T any](f func(F) (T, error)) func(r Ranger[F]) MapRanger[F, result.Wrapper[T]] {
+	return func(r Ranger[F]) MapRanger[F, result.Wrapper[T]] {
+		return MapResult(f, r)
+	}
+}
+
+type FoldRanger[F, T any] struct {
+	f func(T, F) T
+	init T
+	ranger Ranger[F]
+}
+
+func (r FoldRanger[F, T]) Collect() T {
+	var mu sync.Mutex
+	acc := r.init
+	r.ranger.Range(func(v F) bool{
+		mu.Lock()
+		acc = r.f(acc, v)
+		mu.Unlock()
+		return true
+	})
+	return acc
+}
+
+func (r FoldRanger[F, T]) Range(f func(T) bool) {
+	f(r.Collect())
+}
+
+// TODO: Improve doc
+
+// Fold calls the function f on every element of r.
+func Fold[F, T any](f func(T, F) T, init T, r Ranger[F]) FoldRanger[F, T] {
+	return FoldRanger[F, T]{
+		f: f,
+		init: init,
+		ranger: r,
+	}
+}
+
+func FoldFunc[F, T any](f func(T, F) T, init T) func(r Ranger[F]) FoldRanger[F, T] {
+	return func(r Ranger[F]) FoldRanger[F, T] {
+		return Fold(f, init, r)
+	}
+}
+
+func CollectFold[F, T any](f func(T, F) T, init T, r Ranger[F]) T {
+	return Fold(f, init, r).Collect()
+}
+
+func CollectFoldFunc[F, T any](f func(T, F) T, init T) func(Ranger[F]) T {
+	return func(r Ranger[F]) T {
+		return CollectFold(f, init, r)
+	}
+}
+
+type TakeRanger[T any] struct {
+	n uint64
+	ranger Ranger[T]
+}
+
+func (r TakeRanger[T]) Range(f func(T) bool) {
+	var n uint64
+	r.ranger.Range(func(v T) bool{
+		i := atomic.AddUint64(&n, 1)
+		f(v)
+		return i != r.n
+	})
+}
+
+func Take[T any](n uint64, r Ranger[T]) TakeRanger[T] {
+	return TakeRanger[T] {
+		n: n,
+		ranger: r,
+	}
+}
+
+func TakeFunc[T any](n uint64) func(r Ranger[T]) TakeRanger[T] {
+	return func(r Ranger[T]) TakeRanger[T] {
+		return Take(n, r)
+	}
+}
+
+type ReduceRanger[T any] struct {
+	f func(T, T) T
+	ranger Ranger[T]
+}
+
+func (r ReduceRanger[T]) Collect() *T {
+	var mu sync.Mutex
+	var acc *T
+	r.ranger.Range(func(v T) bool{
+		mu.Lock()
+		if acc == nil {
+			acc = &v
+		} else {
+			*acc = r.f(*acc, v)
+		}
+		mu.Unlock()
+		return true
+	})
+	return acc
+}
+
+func (r ReduceRanger[T]) Range(f func(T) bool) {
+	if v := r.Collect(); v != nil {
+		f(*v)
+	}
+}
+
+// Reduce reduces r to element of type T.
+func Reduce[T any](f func(T, T) T, r Ranger[T]) ReduceRanger[T] {
+	return ReduceRanger[T]{
+		f: f,
+		ranger: r,
+	}
+}
+
+func ReduceFunc[T any](f func(T, T) T) func(Ranger[T]) ReduceRanger[T] {
+	return func(r Ranger[T]) ReduceRanger[T] {
+		return Reduce(f, r)
+	}
+}
+
+func CollectReduce[T any](f func(T, T) T, r Ranger[T]) *T {
+	return Reduce(f, r).Collect()
+}
+
+func CollectReduceFunc[T any](f func(T, T) T) func(Ranger[T]) *T {
+	return func(r Ranger[T]) *T {
+		return CollectReduce(f, r)
+	}
+}
+
+type ParallelRanger[T any] struct {
+	n uint
+	ranger Ranger[T]
+}
+
+func (r ParallelRanger[T]) Range(f func(T) bool) {
+	var once sync.Once
+	ok := true
+	ch := make(chan struct{}, r.n)
+	wg := &sync.WaitGroup{}
+	r.ranger.Range(func(v T) bool {
+		wg.Add(1)
+		ch <- struct{}{}
+		go func(v T) {
+			defer wg.Done()
+			if !f(v) {
+				once.Do(func(){ ok = false })
+			}
+			<-ch
+		}(v)
+		return ok
+	})
+	wg.Wait()
+}
+
+func Parallel[T any](n uint, r Ranger[T]) ParallelRanger[T] {
+	return ParallelRanger[T]{
+		n: n,
+		ranger: r,
+	}
+}
+
+func ParallelFunc[T any](n uint) func(Ranger[T]) ParallelRanger[T] {
+	return func(r Ranger[T]) ParallelRanger[T] {
+		return Parallel(n, r)
+	}
+}

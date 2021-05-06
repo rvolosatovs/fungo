@@ -12,41 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package fungo provides functional programming primitives.
+// Package fungo provides functional programming utilities.
 package fungo
 
-// Map calls the function f on every element of the slice vs,
-// returning a new slice of the results.
-func Map[F, T any](f func(F) T, vs ...F) []T {
-	r := make([]T, len(vs))
-	for i, v := range vs {
-		r[i] = f(v)
-	}
-	return r
-}
-
-// TODO: Improve comment
-
-// Fold calls the function f on every element of the slice vs,
-// returning a new result.
-func Fold[F, T any](f func(T, F) T, init T, vs ...F) T {
-	acc := init
-	for _, v := range vs {
-		acc = f(acc, v)
-	}
-	return acc
-}
-
-// Reduce reduces the elements a single element by calling the function f
-// on every element of the slice vs returning a new result.
-func Reduce[T any](f func(T, T) T, vs ...T) T {
-	if len(vs) == 0 {
-		var r T
-		return r
-	}
-	r := vs[0]
-	for _, v := range vs[1:] {
-		r = f(r, v)
-	}
-	return r
-}
+// Zero returns zero value of type T.
+func Zero[T any]() (r T) { return }

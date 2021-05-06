@@ -1,0 +1,212 @@
+package collections_test
+
+import (
+	"fmt"
+	"strconv"
+	"testing"
+
+	"github.com/rvolosatovs/fungo/collections"
+	"github.com/rvolosatovs/fungo/internal/test"
+	"github.com/rvolosatovs/fungo/maps"
+	"github.com/rvolosatovs/fungo/result"
+	"github.com/rvolosatovs/fungo/slices"
+)
+
+type RangerTestCase[F, T any] struct{
+    Name string
+    Collect func(r collections.Ranger[F]) T
+	Values []F
+    Expected T
+}
+
+func TestRanger(t *testing.T) {
+	foldSort := func(acc slices.ValueRanger[int], v int) slices.ValueRanger[int] {
+		// TODO: Implement efficient sort
+		acc = append(acc, v)
+		for i, av := range acc {
+			if v < av {
+				copy(acc[i+1:], acc[i:len(acc)])
+				acc[i] = v
+				break
+			}
+		}
+		return acc
+	}
+
+	foldJoin := func(acc string, v string) string {
+		if acc == "" {
+			return v
+		}
+		return acc + ", " + v
+	}
+
+
+	for _, tc := range []RangerTestCase[int, string]{
+		{
+			Name:     `|x| join(", ", strconv.Itoa(sort((+2)(x))))`,
+			Collect: func(r collections.Ranger[int]) string {
+				return collections.CollectFold[string, string](
+					foldJoin,
+					"",
+					collections.Map[int, string](
+						strconv.Itoa,
+						collections.CollectFold[int, slices.ValueRanger[int]](
+							foldSort,
+							make(slices.ValueRanger[int], 0, 4),
+							collections.Map[int, int](
+								func(v int) int { return v + 2 },
+								r,
+							),
+						),
+					),
+				)
+			},
+			Values: []int{
+				1,
+				5,
+				3,
+				-42,
+				2,
+			},
+			Expected: "-40, 3, 4, 5, 7",
+		},
+		{
+			Name:     `+2 . sort . strconv.Itoa . join ", "`,
+			Collect: collections.Compose(
+				collections.Compose(
+					collections.Compose(
+						collections.MapFunc[int, int](func(v int) int {
+							return v + 2
+						}),
+						collections.CollectFoldFunc[int, slices.ValueRanger[int]](
+							foldSort,
+							make([]int, 0, 4),
+						),
+					),
+					collections.MapFunc[int, string](
+						strconv.Itoa,
+					),
+				),
+				collections.CollectFoldFunc[string, string](
+					foldJoin,
+					"",
+				),
+			),
+			Values: []int{
+				1,
+				5,
+				3,
+				-42,
+				2,
+			},
+			Expected: "-40, 3, 4, 5, 7",
+		},
+		{
+			Name:     `(parallel 3 (pow 2)) . sum . strconv.Itoa . sum`,
+			Collect: collections.Compose(
+				collections.Compose(
+					collections.Compose(
+						collections.Compose(
+							collections.MapFunc[int, int](
+								func(v int) int { return v * v },
+							),
+							collections.ParallelFunc[int](3),
+						),
+						collections.ReduceFunc[int](
+							// TODO: Implement Sum ranger
+							func(acc, v int) int {
+								return acc + v
+							},
+						),
+					),
+					collections.MapFunc[int, string](
+						strconv.Itoa,
+					),
+				),
+				collections.CollectFoldFunc[string, string](
+					func(acc, v string) string {
+						return acc + v
+					},
+					"",
+				),
+			),
+			Values: []int{
+				3,
+				2,
+				-2,
+				5,
+				4,
+			},
+			Expected: "58",
+		},
+		{
+			Name:     `strconv.Itoa . strconv.ParseUint . max . strconv.FormatUint64`,
+			Collect: collections.Compose(
+					collections.Compose(
+						collections.Compose(
+							collections.MapFunc[int, string](strconv.Itoa),
+							collections.MapResultFunc[string, uint64](func(v string) (uint64, error){
+								return strconv.ParseUint(v, 10, 64)
+							}),
+						),
+						collections.ReduceFunc[result.Wrapper[uint64]](func(acc, v result.Wrapper[uint64]) result.Wrapper[uint64] {
+							// TODO: Implement Max ranger
+							switch {
+							case acc.Error != nil:
+								return acc
+							case v.Error != nil, v.Value > acc.Value:
+								return v
+							default:
+								return acc
+							}
+						}),
+					),
+                    collections.CollectFoldFunc[result.Wrapper[uint64], string](func(acc string, v result.Wrapper[uint64]) string {
+						if err := v.Error; err != nil {
+							return acc + fmt.Sprintf("fail: %s", err)
+						}
+						return acc + strconv.FormatUint(v.Value, 10)
+					}, ""),
+				),
+			Values: []int{
+				35,
+				4,
+				42,
+				5,
+				58,
+				566,
+				55,
+				185,
+			},
+			Expected: "566",
+		},
+	} {
+	    t.Run(tc.Name, func(t *testing.T) {
+			for _, r := range [...]collections.Ranger[int]{
+				func() maps.KeyRanger[int, struct{}] {
+					m := map[int]struct{}{}
+					for _, v := range tc.Values {
+						m[v] = struct{}{}
+					}
+					return maps.Keys(m)
+				}(),
+				func() maps.ValueRanger[int, int] {
+					m := map[int]int{}
+					for i, v := range tc.Values {
+						m[i] = v
+					}
+					return maps.Values(m)
+				}(),
+				slices.ValueRanger[int](tc.Values),
+			} {
+				t.Run(fmt.Sprintf("%T", r), func(t *testing.T){
+					for i := 0; i < 2; i++ {
+						t.Run(fmt.Sprintf("run %d", i), func(t *testing.T){
+							test.AssertDeepEqual(t, tc.Collect(r), tc.Expected)
+						})
+					}
+				})
+			}
+	    })
+	}
+}
