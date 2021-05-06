@@ -5,7 +5,7 @@ pkgs.mkShell {
     go_2-dev
 
     (
-      pkgs.writeShellScriptBin "watch" ''
+      pkgs.writeShellScriptBin "watch-test" ''
         set -e
         ${pkgs.fd}/bin/fd --glob '*.go2' . | ${pkgs.entr}/bin/entr -rs '${pkgs.gnumake}/bin/make -B translate test'
     ''
